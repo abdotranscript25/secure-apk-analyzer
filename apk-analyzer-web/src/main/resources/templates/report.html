@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APK Security Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── RESET & VARIABLES ─────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0b0f1a;
+            --bg2:       #111827;
+            --bg3:       #1a2236;
+            --bg4:       #232f47;
+            --border:    rgba(99,130,190,0.18);
+            --text:      #e2e8f0;
+            --muted:     #7a8fa6;
+            --accent:    #3b82f6;
+            --accent2:   #06b6d4;
+
+            --critical:  #ef4444;
+            --high:      #f97316;
+            --medium:    #eab308;
+            --low:       #22c55e;
+            --info:      #3b82f6;
+
+            --critical-bg: rgba(239,68,68,0.08);
+            --high-bg:     rgba(249,115,22,0.08);
+            --medium-bg:   rgba(234,179,8,0.08);
+            --low-bg:      rgba(34,197,94,0.08);
+
+            --radius:    10px;
+            --radius-lg: 16px;
+            --mono:      'JetBrains Mono', monospace;
+            --display:   'Syne', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--display);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── SCROLLBAR ─────────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg2); }
+        ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+        /* ── LAYOUT ────────────────────────────────────────────────── */
+        .page { display: flex; min-height: 100vh; }
+
+        /* ── SIDEBAR ───────────────────────────────────────────────── */
+        .sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            overflow-y: auto;
+            padding: 28px 0;
+            z-index: 100;
+        }
+        .sidebar-logo {
+            padding: 0 24px 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+        .sidebar-logo .logo-text {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .sidebar-logo .logo-sub {
+            color: var(--muted);
+            font-size: 11px;
+            font-family: var(--mono);
+            margin-top: 2px;
+        }
+        .nav-section {
+            padding: 6px 24px 2px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-top: 12px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 24px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .nav-item:hover, .nav-item.active {
+            color: var(--text);
+            background: rgba(59,130,246,0.08);
+            border-left-color: var(--accent);
+        }
+        .nav-item .nav-icon { width: 16px; text-align: center; font-size: 14px; }
+        .nav-badge {
+            margin-left: auto;
+            font-size: 10px;
+            font-family: var(--mono);
+            background: var(--bg4);
+            border-radius: 20px;
+            padding: 1px 7px;
+        }
+        .nav-badge.critical { background: rgba(239,68,68,0.2); color: var(--critical); }
+        .nav-badge.warn     { background: rgba(249,115,22,0.2); color: var(--high); }
+
+        /* ── MAIN CONTENT ──────────────────────────────────────────── */
+        .main {
+            margin-left: 240px;
+            flex: 1;
+            padding: 32px 40px;
+            max-width: calc(100% - 240px);
+        }
+
+        /* ── TOPBAR ────────────────────────────────────────────────── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .topbar-left h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .topbar-left .filename {
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .timestamp {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--mono);
+        }
+        .btn-back {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 18px;
+            border-radius: var(--radius);
+            font-family: var(--display);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn-back:hover { background: var(--bg4); border-color: var(--accent); color: var(--accent); }
+
+        /* ── SECTION TITLES ────────────────────────────────────────── */
+        .section { margin-bottom: 40px; scroll-margin-top: 24px; }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .section-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .section-count {
+            margin-left: auto;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            background: var(--bg3);
+            padding: 3px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 36px 0;
+        }
+
+        /* ── SCORE HERO ────────────────────────────────────────────── */
+        .hero {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 28px;
+            align-items: center;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 240px; height: 240px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59,130,246,0.12), transparent 70%);
+            pointer-events: none;
+        }
+        .score-ring {
+            width: 140px; height: 140px;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .score-ring svg { transform: rotate(-90deg); }
+        .score-ring-bg    { fill: none; stroke: var(--bg4); stroke-width: 10; }
+        .score-ring-fill  { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+        .score-ring-label {
+            position: absolute;
+            inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        .score-number {
+            font-size: 34px;
+            font-weight: 800;
+            font-family: var(--mono);
+            line-height: 1;
+        }
+        .score-max { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+        .hero-info { display: flex; flex-direction: column; gap: 14px; }
+        .hero-grade {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .grade-badge {
+            font-size: 28px;
+            font-weight: 800;
+            width: 52px; height: 52px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 12px;
+            font-family: var(--mono);
+        }
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: var(--mono);
+            letter-spacing: 0.5px;
+        }
+        .risk-critical { background: rgba(239,68,68,0.15); color: var(--critical); border: 1px solid rgba(239,68,68,0.3); }
+        .risk-high     { background: rgba(249,115,22,0.15); color: var(--high);     border: 1px solid rgba(249,115,22,0.3); }
+        .risk-medium   { background: rgba(234,179,8,0.15);  color: var(--medium);   border: 1px solid rgba(234,179,8,0.3);  }
+        .risk-low      { background: rgba(34,197,94,0.15);  color: var(--low);      border: 1px solid rgba(34,197,94,0.3);  }
+
+        .hero-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .hero-stat { display: flex; align-items: center; gap: 8px; }
+        .hero-stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .hero-stat-val { font-weight: 800; font-family: var(--mono); font-size: 18px; }
+        .hero-stat-lbl { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        /* ── SEVERITY COUNTER ROW ──────────────────────────────────── */
+        .sev-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .sev-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .sev-card:hover { transform: translateY(-2px); }
+        .sev-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .sev-card.c-critical::after { background: var(--critical); }
+        .sev-card.c-high::after     { background: var(--high); }
+        .sev-card.c-medium::after   { background: var(--medium); }
+        .sev-card.c-low::after      { background: var(--low); }
+
+        .sev-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .sev-icon.c-critical { background: rgba(239,68,68,0.15); }
+        .sev-icon.c-high     { background: rgba(249,115,22,0.15); }
+        .sev-icon.c-medium   { background: rgba(234,179,8,0.15);  }
+        .sev-icon.c-low      { background: rgba(34,197,94,0.15);  }
+
+        .sev-num  { font-size: 26px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+        .sev-lbl  { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 2px; }
+
+        /* ── APK INFO GRID ─────────────────────────────────────────── */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .info-row {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .info-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+        .info-value { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); word-break: break-all; }
+        .info-value.danger { color: var(--critical); }
+        .info-value.warn   { color: var(--high); }
+        .info-value.ok     { color: var(--low); }
+
+        /* ── FINDING CARDS ─────────────────────────────────────────── */
+        .finding-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .finding-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .finding-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .finding-header:hover { background: rgba(255,255,255,0.02); }
+
+        .sev-pill {
+            flex-shrink: 0;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: 0.8px;
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+        .sev-pill.CRITICAL { background: rgba(239,68,68,0.15);  color: var(--critical); border: 1px solid rgba(239,68,68,0.3);  }
+        .sev-pill.HIGH     { background: rgba(249,115,22,0.15); color: var(--high);     border: 1px solid rgba(249,115,22,0.3); }
+        .sev-pill.MEDIUM   { background: rgba(234,179,8,0.15);  color: var(--medium);   border: 1px solid rgba(234,179,8,0.3);  }
+        .sev-pill.LOW      { background: rgba(34,197,94,0.15);  color: var(--low);      border: 1px solid rgba(34,197,94,0.3);  }
+
+        .finding-title   { font-weight: 600; font-size: 13px; flex: 1; }
+        .finding-location {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            background: var(--bg3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .finding-chevron { color: var(--muted); font-size: 12px; transition: transform 0.2s; flex-shrink: 0; }
+        .finding-card.open .finding-chevron { transform: rotate(90deg); }
+
+        .finding-body {
+            display: none;
+            border-top: 1px solid var(--border);
+            padding: 16px 18px;
+            background: var(--bg3);
+        }
+        .finding-card.open .finding-body { display: block; }
+
+        .finding-body-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+        .fb-block-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        .fb-block-value { font-size: 13px; color: var(--text); }
+
+        .evidence-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: #93c5fd;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .recommendation-block {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: rgba(34,197,94,0.06);
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #86efac;
+        }
+        .recommendation-block .rec-icon { flex-shrink: 0; margin-top: 1px; }
+
+        /* ── PERMISSION LIST ───────────────────────────────────────── */
+        .perm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px;
+        }
+        .perm-item {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .perm-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+        .perm-name  { font-family: var(--mono); font-size: 11.5px; font-weight: 600; word-break: break-all; }
+        .perm-tag   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+        /* ── URLS / EMAILS / IPs ───────────────────────────────────── */
+        .data-list {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .data-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 16px;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono);
+            font-size: 11.5px;
+        }
+        .data-item:last-child { border-bottom: none; }
+        .data-item-icon { color: var(--muted); flex-shrink: 0; }
+        .data-item-val  { color: var(--accent2); word-break: break-all; }
+
+        /* ── RECOMMENDATION SECTION ────────────────────────────────── */
+        .rec-list { display: flex; flex-direction: column; gap: 10px; }
+        .rec-item {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-left: 3px solid;
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+        .rec-item.p-critical { border-left-color: var(--critical); }
+        .rec-item.p-high     { border-left-color: var(--high); }
+        .rec-item.p-medium   { border-left-color: var(--medium); }
+        .rec-item.p-low      { border-left-color: var(--low); }
+        .rec-item.p-info     { border-left-color: var(--info); }
+        .rec-priority {
+            flex-shrink: 0;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-top: 1px;
+        }
+        .rec-priority.p-critical { background: rgba(239,68,68,0.15); color: var(--critical); }
+        .rec-priority.p-high     { background: rgba(249,115,22,0.15); color: var(--high); }
+        .rec-priority.p-medium   { background: rgba(234,179,8,0.15);  color: var(--medium); }
+        .rec-priority.p-low      { background: rgba(34,197,94,0.15);  color: var(--low); }
+        .rec-priority.p-info     { background: rgba(59,130,246,0.15); color: var(--info); }
+        .rec-text strong { font-weight: 700; display: block; margin-bottom: 2px; font-size: 13px; }
+        .rec-text span   { color: var(--muted); font-size: 12px; }
+
+        /* ── EMPTY STATE ───────────────────────────────────────────── */
+        .empty-state {
+            background: var(--bg2);
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .empty-state .es-icon { font-size: 28px; margin-bottom: 8px; }
+
+        /* ── TABS ──────────────────────────────────────────────────── */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 4px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 7px 12px;
+            border: none;
+            background: none;
+            color: var(--muted);
+            font-family: var(--display);
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tab-btn.active { background: var(--bg4); color: var(--text); }
+        .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.04); }
+        .tab-count {
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 20px;
+            background: var(--bg);
+        }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        /* ── ANIMATIONS ────────────────────────────────────────────── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .section { animation: fadeUp 0.4s ease both; }
+        .section:nth-child(1) { animation-delay: 0.05s; }
+        .section:nth-child(2) { animation-delay: 0.10s; }
+        .section:nth-child(3) { animation-delay: 0.15s; }
+        .section:nth-child(4) { animation-delay: 0.20s; }
+        .section:nth-child(5) { animation-delay: 0.25s; }
+
+        /* ── PRINT ─────────────────────────────────────────────────── */
+        @media print {
+            .sidebar, .btn-back { display: none !important; }
+            .main { margin-left: 0; max-width: 100%; padding: 16px; }
+            .finding-body { display: block !important; }
+        }
+
+        /* ── RESPONSIVE ────────────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .main    { margin-left: 0; max-width: 100%; padding: 16px; }
+            .sev-row { grid-template-columns: repeat(2, 1fr); }
+            .hero    { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+            .finding-body-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+
+    <!-- ════════════════════════════════════════
+         SIDEBAR
+    ═════════════════════════════════════════ -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-text">⬡ SecureAPK</div>
+            <div class="logo-sub">Static Analysis Report</div>
+        </div>
+
+        <div class="nav-section">Résumé</div>
+        <a href="#overview"     class="nav-item active"><span class="nav-icon">◈</span> Vue d'ensemble</a>
+        <a href="#apk-info"     class="nav-item"><span class="nav-icon">◉</span> Infos APK</a>
+        <a href="#ai-analysis" class="nav-item">
+            <span class="nav-icon">🧠</span> AI Behavior
+        </a>
+
+        <div class="nav-section">Analyse</div>
+        <a href="#manifest"     class="nav-item">
+            <span class="nav-icon">⊞</span> Manifest
+            <span class="nav-badge critical" th:if="${not #lists.isEmpty(report.manifestFindings)}"
+                  th:text="${#lists.size(report.manifestFindings)}"></span>
+        </a>
+        <a href="#permissions"  class="nav-item">
+            <span class="nav-icon">⊛</span> Permissions
+            <span class="nav-badge warn" th:if="${not #lists.isEmpty(report.dangerousPermissions)}"
+                  th:text="${#lists.size(report.dangerousPermissions)}"></span>
+        </a>
+        <a href="#code"         class="nav-item">
+            <span class="nav-icon">⌨</span> Code
+            <span class="nav-badge critical" th:if="${not #lists.isEmpty(report.codeFindings)}"
+                  th:text="${#lists.size(report.codeFindings)}"></span>
+        </a>
+        <a href="#network"      class="nav-item">
+            <span class="nav-icon">⊕</span> Réseau
+            <span class="nav-badge warn" th:if="${not #lists.isEmpty(report.networkFindings)}"
+                  th:text="${#lists.size(report.networkFindings)}"></span>
+        </a>
+        <a href="#crypto"       class="nav-item">
+            <span class="nav-icon">⊗</span> Cryptographie
+            <span class="nav-badge warn" th:if="${not #lists.isEmpty(report.cryptoFindings)}"
+                  th:text="${#lists.size(report.cryptoFindings)}"></span>
+        </a>
+        <a href="#data"         class="nav-item">
+            <span class="nav-icon">⊜</span> Données sensibles
+            <span class="nav-badge critical" th:if="${not #lists.isEmpty(report.dataFindings)}"
+                  th:text="${#lists.size(report.dataFindings)}"></span>
+        </a>
+
+        <div class="nav-section">Informations</div>
+        <a href="#urls"         class="nav-item"><span class="nav-icon">⊙</span> URLs &amp; IPs</a>
+        <a href="#recommendations" class="nav-item"><span class="nav-icon">◎</span> Recommandations</a>
+    </nav>
+
+    <!-- ════════════════════════════════════════
+         MAIN
+    ═════════════════════════════════════════ -->
+    <main class="main">
+
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1>Rapport de sécurité APK</h1>
+                <div class="filename" th:text="${report.fileName}">app.apk</div>
+            </div>
+            <div class="topbar-right">
+                <span class="timestamp">Généré le <span th:text="${#dates.format(#dates.createNow(), 'dd/MM/yyyy HH:mm')}">—</span></span>
+                <a href="/" class="btn-back">← Nouvelle analyse</a>
+            </div>
+        </div>
+
+        <!-- ── SECTION : VUE D'ENSEMBLE ───────────────────────────── -->
+        <div class="section" id="overview">
+            <div class="section-header">
+                <div class="section-icon">◈</div>
+                <div class="section-title">Vue d'ensemble</div>
+            </div>
+
+            <!-- Score Hero -->
+            <div class="hero">
+                <!-- Ring SVG -->
+                <div class="score-ring">
+                    <svg viewBox="0 0 140 140" width="140" height="140">
+                        <circle class="score-ring-bg" cx="70" cy="70" r="58"/>
+                        <!-- stroke-dasharray="364.4" = 2π×58 -->
+                        <circle class="score-ring-fill" cx="70" cy="70" r="58"
+                                th:style="'stroke:' + (${report.securityScore} >= 70 ? '#22c55e' : (${report.securityScore} >= 50 ? '#eab308' : '#ef4444')) + '; stroke-dasharray:364.4; stroke-dashoffset:' + (364.4 - (364.4 * ${report.securityScore} / 100))"/>
+                    </svg>
+                    <div class="score-ring-label">
+                        <span class="score-number"
+                              th:style="'color:' + (${report.securityScore} >= 70 ? '#22c55e' : (${report.securityScore} >= 50 ? '#eab308' : '#ef4444'))"
+                              th:text="${report.securityScore}">0</span>
+                        <span class="score-max">/100</span>
+                    </div>
+                </div>
+
+                <div class="hero-info">
+                    <div class="hero-grade">
+                        <div class="grade-badge"
+                             th:style="'background:' + (${report.securityScore} >= 70 ? 'rgba(34,197,94,0.15); color:#22c55e' : (${report.securityScore} >= 50 ? 'rgba(234,179,8,0.15); color:#eab308' : 'rgba(239,68,68,0.15); color:#ef4444'))"
+                             th:text="${report.securityGrade}">F</div>
+                        <div>
+                            <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">Niveau de risque global</div>
+                            <span class="risk-badge"
+                                  th:classappend="${report.riskLevel == 'CRITICAL'} ? 'risk-critical' : (${report.riskLevel == 'HIGH'} ? 'risk-high' : (${report.riskLevel == 'MEDIUM'} ? 'risk-medium' : 'risk-low'))"
+                                  th:text="${report.riskLevel}">HIGH</span>
+                        </div>
+                    </div>
+
+                    <div class="hero-stats">
+                        <div class="hero-stat">
+                            <div class="hero-stat-dot" style="background:var(--critical)"></div>
+                            <div>
+                                <div class="hero-stat-val" style="color:var(--critical)" th:text="${report.criticalCount}">0</div>
+                                <div class="hero-stat-lbl">Critical</div>
+                            </div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-dot" style="background:var(--high)"></div>
+                            <div>
+                                <div class="hero-stat-val" style="color:var(--high)" th:text="${report.highCount}">0</div>
+                                <div class="hero-stat-lbl">High</div>
+                            </div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-dot" style="background:var(--medium)"></div>
+                            <div>
+                                <div class="hero-stat-val" style="color:var(--medium)" th:text="${report.mediumCount}">0</div>
+                                <div class="hero-stat-lbl">Medium</div>
+                            </div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-dot" style="background:var(--low)"></div>
+                            <div>
+                                <div class="hero-stat-val" style="color:var(--low)" th:text="${report.lowCount}">0</div>
+                                <div class="hero-stat-lbl">Low</div>
+                            </div>
+                        </div>
+                        <div class="hero-stat" style="margin-left:10px; padding-left:10px; border-left:1px solid var(--border)">
+                            <div>
+                                <div class="hero-stat-val" th:text="${report.totalFindings}">0</div>
+                                <div class="hero-stat-lbl">Total findings</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Severity counters -->
+            <div class="sev-row">
+                <div class="sev-card c-critical">
+                    <div class="sev-icon c-critical">🔴</div>
+                    <div>
+                        <div class="sev-num" style="color:var(--critical)" th:text="${report.criticalCount}">0</div>
+                        <div class="sev-lbl">Critical</div>
+                    </div>
+                </div>
+                <div class="sev-card c-high">
+                    <div class="sev-icon c-high">🟠</div>
+                    <div>
+                        <div class="sev-num" style="color:var(--high)" th:text="${report.highCount}">0</div>
+                        <div class="sev-lbl">High</div>
+                    </div>
+                </div>
+                <div class="sev-card c-medium">
+                    <div class="sev-icon c-medium">🟡</div>
+                    <div>
+                        <div class="sev-num" style="color:var(--medium)" th:text="${report.mediumCount}">0</div>
+                        <div class="sev-lbl">Medium</div>
+                    </div>
+                </div>
+                <div class="sev-card c-low">
+                    <div class="sev-icon c-low">🟢</div>
+                    <div>
+                        <div class="sev-num" style="color:var(--low)" th:text="${report.lowCount}">0</div>
+                        <div class="sev-lbl">Low</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECTION :  AI ─────────────────────────────────── -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon">🤖</div>
+                <div class="section-title">AI Risk Prediction</div>
+            </div>
+
+            <div class="hero" style="padding:24px; display:flex; justify-content:center;">
+                <div style="display:flex; flex-direction:column; align-items:center;
+                            gap:20px; width:100%;">
+
+                    <!-- Verdict + Confidence -->
+                    <div style="display:flex; align-items:center; gap:24px;
+                                flex-wrap:wrap; justify-content:center;">
+
+                        <div class="grade-badge"
+                             th:style="'font-size:14px; padding:10px 20px; width:auto; height:auto; border-radius:10px;' +
+                                 (${predictedRisk == 'MALWARE'} ?
+                                 'background:rgba(239,68,68,0.15); color:#ef4444' :
+                                 (${predictedRisk == 'HIGH_RISK'} ?
+                                 'background:rgba(249,115,22,0.15); color:#f97316' :
+                                 (${predictedRisk == 'SUSPICIOUS'} ?
+                                 'background:rgba(234,179,8,0.15); color:#eab308' :
+                                 'background:rgba(34,197,94,0.15); color:#22c55e')))"
+                             th:text="${predictedRisk}">SAFE</div>
+
+                        <div style="width:1px; height:40px; background:var(--border);"></div>
+
+                        <div style="display:flex; flex-direction:column;
+                                    align-items:center; gap:4px;">
+                            <div style="font-size:11px; color:var(--muted); font-weight:600;
+                                        letter-spacing:1px; text-transform:uppercase;">
+                                Confidence
+                            </div>
+                            <div style="font-size:32px; font-weight:800;
+                                        font-family:var(--mono); color:var(--accent2);"
+                                 th:text="${#numbers.formatDecimal(predictionConfidence * 100, 1, 0) + '%'}">
+                                0%
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barre -->
+                    <div style="width:100%; max-width:400px;">
+                        <div style="height:8px; background:var(--bg4);
+                                    border-radius:20px; overflow:hidden;">
+                            <div th:style="'height:100%; border-radius:20px;
+                                           background:linear-gradient(90deg,var(--accent),var(--accent2));
+                                           width:' + ${predictionConfidence * 100} + '%;'">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="color:var(--muted); font-size:13px; text-align:center;">
+                        This prediction is generated using the integrated
+                        <strong style="color:var(--text);">RiskPredictor AI model</strong>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : AI BEHAVIORAL ANALYSIS ───────────────────── -->
+        <div class="section" id="ai-analysis">
+            <div class="section-header">
+                <div class="section-icon">🧠</div>
+                <div class="section-title">AI Behavioral Analysis</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:start;
+                background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg);
+                padding:28px; margin-bottom:20px; position:relative; overflow:hidden;">
+
+                <!-- Glow décoratif -->
+                <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px;
+                    border-radius:50%; pointer-events:none;
+                    background:radial-gradient(circle,
+                        rgba(6,182,212,0.10) 0%,
+                        rgba(59,130,246,0.06) 50%,
+                        transparent 70%);">
+                </div>
+
+                <!-- Score circulaire IA -->
+                <div style="position:relative; width:110px; height:110px; flex-shrink:0;">
+                    <svg viewBox="0 0 110 110" width="110" height="110"
+                         style="transform:rotate(-90deg);">
+                        <circle cx="55" cy="55" r="46"
+                                fill="none" stroke="var(--bg4)" stroke-width="8"/>
+                        <circle cx="55" cy="55" r="46" fill="none"
+                                stroke-width="8" stroke-linecap="round"
+                                th:style="'stroke:' +
+                            (${ai.riskScore >= 80} ? '#ef4444' :
+                            (${ai.riskScore >= 50} ? '#f97316' :
+                            (${ai.riskScore >= 25} ? '#eab308' : '#22c55e')))
+                            + '; stroke-dasharray:289.0; stroke-dashoffset:'
+                            + (289.0 - (289.0 * ${ai.riskScore} / 100))"/>
+                    </svg>
+                    <div style="position:absolute; inset:0; display:flex; flex-direction:column;
+                        align-items:center; justify-content:center;">
+                <span style="font-size:26px; font-weight:800; font-family:var(--mono); line-height:1;"
+                      th:style="'color:' +
+                          (${ai.riskScore >= 80} ? '#ef4444' :
+                          (${ai.riskScore >= 50} ? '#f97316' :
+                          (${ai.riskScore >= 25} ? '#eab308' : '#22c55e')))"
+                      th:text="${ai.riskScore}">0</span>
+                        <span style="font-size:10px; color:var(--muted); font-family:var(--mono);">/100</span>
+                    </div>
+                </div>
+
+                <!-- Verdict + détails -->
+                <div style="display:flex; flex-direction:column; gap:14px;">
+
+                    <!-- Verdict badge -->
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <div style="font-size:11px; font-weight:600; letter-spacing:1px;
+                            text-transform:uppercase; color:var(--muted);">
+                            AI Verdict
+                        </div>
+                        <span class="risk-badge"
+                              th:classappend="${ai.verdict == 'MALWARE'}    ? 'risk-critical' :
+                                      (${ai.verdict == 'HIGH_RISK'} ? 'risk-high'     :
+                                      (${ai.verdict == 'SUSPICIOUS'}? 'risk-medium'   : 'risk-low'))"
+                              style="font-size:13px; padding:5px 16px; font-weight:800; letter-spacing:1px;"
+                              th:text="${ai.verdict}">SAFE</span>
+                    </div>
+
+                    <!-- Behaviors -->
+                    <div>
+                        <div style="font-size:10px; font-weight:600; letter-spacing:1px;
+                            text-transform:uppercase; color:var(--muted); margin-bottom:8px;">
+                            Comportements détectés
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <div th:each="b : ${ai.behaviors}"
+                                 style="display:flex; align-items:flex-start; gap:8px;
+                                background:var(--bg3); border:1px solid var(--border);
+                                border-radius:8px; padding:8px 12px;
+                                font-size:12px; color:var(--text);">
+                                <span style="color:var(--accent2); flex-shrink:0; margin-top:1px;">◈</span>
+                                <span th:text="${b}">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Threats -->
+            <div th:if="${not #lists.isEmpty(ai.threats)}">
+                <div style="font-size:11px; font-weight:600; letter-spacing:1px;
+                    text-transform:uppercase; color:var(--muted); margin-bottom:10px;">
+                    Menaces identifiées
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div th:each="t : ${ai.threats}"
+                         style="display:flex; align-items:flex-start; gap:10px;
+                        background:rgba(239,68,68,0.05);
+                        border:1px solid rgba(239,68,68,0.2);
+                        border-left:3px solid var(--critical);
+                        border-radius:var(--radius); padding:12px 16px;
+                        font-size:13px; color:#fca5a5;">
+                        <span style="flex-shrink:0; margin-top:1px;">⚠</span>
+                        <span th:text="${t}">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cas SAFE : aucune menace -->
+            <div th:if="${#lists.isEmpty(ai.threats)}"
+                 style="background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2);
+                border-radius:var(--radius); padding:14px 18px;
+                display:flex; align-items:center; gap:10px;
+                font-size:13px; color:#86efac;">
+                <span>✓</span>
+                <span>Aucune menace comportementale détectée.</span>
+            </div>
+        </div>
+
+        <!-- ── SECTION : INFOS APK ─────────────────────────────────── -->
+        <div class="section" id="apk-info">
+            <div class="section-header">
+                <div class="section-icon">◉</div>
+                <div class="section-title">Informations APK</div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Nom du fichier</div>
+                    <div class="info-value" th:text="${report.fileName}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Package</div>
+                    <div class="info-value" th:text="${report.packageName ?: 'Inconnu'}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Version</div>
+                    <div class="info-value"
+                         th:text="${(report.versionName ?: '—') + '  (code: ' + report.versionCode + ')'}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Taille</div>
+                    <div class="info-value"
+                         th:text="${#numbers.formatDecimal(report.fileSize / 1048576.0, 1, 2)} + ' MB'">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">minSdkVersion</div>
+                    <div class="info-value"
+                         th:classappend="${report.minSdk > 0 and report.minSdk < 29} ? 'danger' : 'ok'"
+                         th:text="${report.minSdk > 0 ? 'API ' + report.minSdk + (report.minSdk < 29 ? '  ⚠ Obsolète' : '  ✓ OK') : '—'}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">targetSdkVersion</div>
+                    <div class="info-value"
+                         th:classappend="${report.targetSdk > 0 and report.targetSdk < 33} ? 'warn' : 'ok'"
+                         th:text="${report.targetSdk > 0 ? 'API ' + report.targetSdk : '—'}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Classes analysées</div>
+                    <div class="info-value" th:text="${report.totalClasses + ' fichiers Java'}">—</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Bibliothèques natives</div>
+                    <div class="info-value"
+                         th:text="${not #sets.isEmpty(report.nativeLibraries)} ? ${#sets.size(report.nativeLibraries)} + ' .so détectés' : 'Aucune'">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : MANIFEST ──────────────────────────────────── -->
+        <div class="section" id="manifest">
+            <div class="section-header">
+                <div class="section-icon">⊞</div>
+                <div class="section-title">Analyse du AndroidManifest.xml</div>
+                <div class="section-count" th:text="${#lists.size(report.manifestFindings)} + ' findings'">0 findings</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Le manifest déclare les composants, permissions et configurations de sécurité de l'application.
+                Les mauvaises configurations ici exposent l'application à des attaques comme le debug à distance,
+                la sauvegarde non autorisée, ou le détournement de tâche (StrandHogg).
+            </p>
+
+            <div class="finding-list" th:if="${not #lists.isEmpty(report.manifestFindings)}">
+                <div th:each="f : ${report.manifestFindings}" class="finding-card">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="sev-pill"
+                              th:classappend="${f.severity.name()}"
+                              th:text="${f.severity.name()}">HIGH</span>
+                        <span class="finding-title" th:text="${f.recommendation}">—</span>
+                        <span class="finding-location" th:text="${f.location}">—</span>
+                        <span class="finding-chevron">▶</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="finding-body-grid">
+                            <div>
+                                <div class="fb-block-label">Type de vulnérabilité</div>
+                                <div class="fb-block-value" th:text="${f.type}">—</div>
+                            </div>
+                            <div>
+                                <div class="fb-block-label">Labels détectés</div>
+                                <div class="fb-block-value" th:text="${#strings.listJoin(f.sensitiveLabels, ', ')}">—</div>
+                            </div>
+                        </div>
+                        <div class="fb-block-label">Valeur / Evidence</div>
+                        <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                        <div class="recommendation-block">
+                            <span class="rec-icon">✦</span>
+                            <span th:text="${f.recommendation}">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(report.manifestFindings)}">
+                <div class="es-icon">✓</div>
+                Aucun problème détecté dans le manifest.
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : PERMISSIONS ───────────────────────────────── -->
+        <div class="section" id="permissions">
+            <div class="section-header">
+                <div class="section-icon">⊛</div>
+                <div class="section-title">Permissions</div>
+                <div class="section-count"
+                     th:text="${#sets.size(report.permissions)} + ' total · ' + ${#sets.size(report.dangerousPermissions)} + ' dangereuses'">
+                </div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Les permissions dangereuses donnent accès à des données personnelles ou à des fonctionnalités
+                sensibles du téléphone. Chaque permission inutile augmente la surface d'attaque de l'application.
+            </p>
+
+            <!-- Tabs : dangereuses / toutes -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab(this, 'tab-dangerous')">
+                    ⚠ Dangereuses
+                    <span class="tab-count" th:text="${#sets.size(report.dangerousPermissions)}">0</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(this, 'tab-all-perms')">
+                    ◉ Toutes
+                    <span class="tab-count" th:text="${#sets.size(report.permissions)}">0</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(this, 'tab-perm-findings')">
+                    ⊞ Findings
+                    <span class="tab-count" th:text="${#lists.size(report.permissionFindings)}">0</span>
+                </button>
+            </div>
+
+            <div id="tab-dangerous" class="tab-pane active">
+                <div class="perm-grid" th:if="${not #sets.isEmpty(report.dangerousPermissions)}">
+                    <div th:each="perm : ${report.dangerousPermissions}" class="perm-item">
+                        <div class="perm-dot" style="background:var(--high)"></div>
+                        <div>
+                            <div class="perm-name" th:text="${perm}">—</div>
+                            <div class="perm-tag">Permission dangereuse</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.dangerousPermissions)}">
+                    <div class="es-icon">✓</div>Aucune permission dangereuse détectée.
+                </div>
+            </div>
+
+            <div id="tab-all-perms" class="tab-pane">
+                <div class="perm-grid" th:if="${not #sets.isEmpty(report.permissions)}">
+                    <div th:each="perm : ${report.permissions}" class="perm-item">
+                        <div class="perm-dot"
+                             th:style="${report.dangerousPermissions.contains(perm)} ? 'background:var(--high)' : 'background:var(--muted)'"></div>
+                        <div>
+                            <div class="perm-name" th:text="${perm}">—</div>
+                            <div class="perm-tag"
+                                 th:text="${report.dangerousPermissions.contains(perm)} ? 'Dangereuse' : 'Normale'">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.permissions)}">
+                    <div class="es-icon">✓</div>Aucune permission déclarée.
+                </div>
+            </div>
+
+            <div id="tab-perm-findings" class="tab-pane">
+                <div class="finding-list" th:if="${not #lists.isEmpty(report.permissionFindings)}">
+                    <div th:each="f : ${report.permissionFindings}" class="finding-card">
+                        <div class="finding-header" onclick="toggleFinding(this)">
+                            <span class="sev-pill" th:classappend="${f.severity.name()}" th:text="${f.severity.name()}">HIGH</span>
+                            <span class="finding-title" th:text="${f.recommendation}">—</span>
+                            <span class="finding-location" th:text="${f.location}">—</span>
+                            <span class="finding-chevron">▶</span>
+                        </div>
+                        <div class="finding-body">
+                            <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                            <div class="recommendation-block">
+                                <span class="rec-icon">✦</span>
+                                <span th:text="${f.recommendation}">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#lists.isEmpty(report.permissionFindings)}">
+                    <div class="es-icon">✓</div>Aucun finding de permission.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : CODE ─────────────────────────────────────── -->
+        <div class="section" id="code">
+            <div class="section-header">
+                <div class="section-icon">⌨</div>
+                <div class="section-title">Analyse du code Java</div>
+                <div class="section-count" th:text="${#lists.size(report.codeFindings)} + ' findings'">0</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Analyse statique du code décompilé par JADX. Détecte les appels dangereux (exécution de commandes,
+                chargement dynamique de code), les vulnérabilités WebView (XSS, RCE via addJavascriptInterface),
+                les injections SQL, les logs exposant des données sensibles, et les secrets en dur.
+            </p>
+
+            <div class="finding-list" th:if="${not #lists.isEmpty(report.codeFindings)}">
+                <div th:each="f : ${report.codeFindings}" class="finding-card">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="sev-pill" th:classappend="${f.severity.name()}" th:text="${f.severity.name()}">HIGH</span>
+                        <span class="finding-title" th:text="${f.recommendation}">—</span>
+                        <span class="finding-location" th:text="${f.location}">—</span>
+                        <span class="finding-chevron">▶</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="finding-body-grid">
+                            <div>
+                                <div class="fb-block-label">Type</div>
+                                <div class="fb-block-value" th:text="${f.type}">—</div>
+                            </div>
+                            <div>
+                                <div class="fb-block-label">Labels</div>
+                                <div class="fb-block-value" th:text="${#strings.listJoin(f.sensitiveLabels, ', ')}">—</div>
+                            </div>
+                        </div>
+                        <div class="fb-block-label">Extrait de code</div>
+                        <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                        <div class="recommendation-block">
+                            <span class="rec-icon">✦</span>
+                            <span th:text="${f.recommendation}">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(report.codeFindings)}">
+                <div class="es-icon">✓</div>Aucun problème de code détecté.
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : RÉSEAU ───────────────────────────────────── -->
+        <div class="section" id="network">
+            <div class="section-header">
+                <div class="section-icon">⊕</div>
+                <div class="section-title">Sécurité réseau</div>
+                <div class="section-count" th:text="${#lists.size(report.networkFindings)} + ' findings'">0</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Vérifie la configuration TLS/SSL, la présence d'URLs HTTP non chiffrées, la configuration
+                <code style="font-family:var(--mono); font-size:11px; color:var(--accent2)">network_security_config.xml</code>,
+                et les certificats custom qui pourraient permettre des attaques Man-in-the-Middle.
+            </p>
+
+            <div class="finding-list" th:if="${not #lists.isEmpty(report.networkFindings)}">
+                <div th:each="f : ${report.networkFindings}" class="finding-card">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="sev-pill" th:classappend="${f.severity.name()}" th:text="${f.severity.name()}">HIGH</span>
+                        <span class="finding-title" th:text="${f.recommendation}">—</span>
+                        <span class="finding-location" th:text="${f.location}">—</span>
+                        <span class="finding-chevron">▶</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="fb-block-label">URL / Evidence</div>
+                        <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                        <div class="recommendation-block">
+                            <span class="rec-icon">✦</span>
+                            <span th:text="${f.recommendation}">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(report.networkFindings)}">
+                <div class="es-icon">✓</div>Aucun problème réseau détecté.
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : CRYPTOGRAPHIE ────────────────────────────── -->
+        <div class="section" id="crypto">
+            <div class="section-header">
+                <div class="section-icon">⊗</div>
+                <div class="section-title">Cryptographie</div>
+                <div class="section-count" th:text="${#lists.size(report.cryptoFindings)} + ' findings'">0</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Détecte l'utilisation d'algorithmes obsolètes (MD5, SHA-1, DES, RC4), de modes de chiffrement
+                non sécurisés (ECB), de générateurs aléatoires faibles (<code style="font-family:var(--mono); font-size:11px; color:var(--accent2)">java.util.Random</code>)
+                et de vecteurs d'initialisation statiques.
+            </p>
+
+            <div class="finding-list" th:if="${not #lists.isEmpty(report.cryptoFindings)}">
+                <div th:each="f : ${report.cryptoFindings}" class="finding-card">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="sev-pill" th:classappend="${f.severity.name()}" th:text="${f.severity.name()}">MEDIUM</span>
+                        <span class="finding-title" th:text="${f.recommendation}">—</span>
+                        <span class="finding-location" th:text="${f.location}">—</span>
+                        <span class="finding-chevron">▶</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="fb-block-label">Algorithme / Evidence</div>
+                        <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                        <div class="recommendation-block">
+                            <span class="rec-icon">✦</span>
+                            <span th:text="${f.recommendation}">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(report.cryptoFindings)}">
+                <div class="es-icon">✓</div>Aucun problème cryptographique détecté.
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : DONNÉES SENSIBLES ───────────────────────── -->
+        <div class="section" id="data">
+            <div class="section-header">
+                <div class="section-icon">⊜</div>
+                <div class="section-title">Données sensibles exposées</div>
+                <div class="section-count" th:text="${#lists.size(report.dataFindings)} + ' findings'">0</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:14px;">
+                Secrets, clés API, tokens JWT, clés AWS/Firebase/Google, clés PEM et emails détectés
+                dans le code source, les ressources XML ou les bibliothèques natives.
+                Ces données permettent à un attaquant d'usurper l'identité de l'application ou d'accéder
+                à l'infrastructure backend.
+            </p>
+
+            <div class="finding-list" th:if="${not #lists.isEmpty(report.dataFindings)}">
+                <div th:each="f : ${report.dataFindings}" class="finding-card">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="sev-pill" th:classappend="${f.severity.name()}" th:text="${f.severity.name()}">CRITICAL</span>
+                        <span class="finding-title" th:text="${f.recommendation}">—</span>
+                        <span class="finding-location" th:text="${f.location}">—</span>
+                        <span class="finding-chevron">▶</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="finding-body-grid">
+                            <div>
+                                <div class="fb-block-label">Type</div>
+                                <div class="fb-block-value" th:text="${f.type}">—</div>
+                            </div>
+                            <div>
+                                <div class="fb-block-label">Labels</div>
+                                <div class="fb-block-value" th:text="${#strings.listJoin(f.sensitiveLabels, ', ')}">—</div>
+                            </div>
+                        </div>
+                        <div class="fb-block-label">Valeur détectée</div>
+                        <div class="evidence-block" th:text="${f.rawValueSnippet}">—</div>
+                        <div class="recommendation-block">
+                            <span class="rec-icon">✦</span>
+                            <span th:text="${f.recommendation}">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(report.dataFindings)}">
+                <div class="es-icon">✓</div>Aucune donnée sensible exposée.
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : URLs & IPs ───────────────────────────────── -->
+        <div class="section" id="urls">
+            <div class="section-header">
+                <div class="section-icon">⊙</div>
+                <div class="section-title">URLs, Emails &amp; Adresses IP</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
+                Toutes les URLs, emails et IPs extraits du code et des ressources.
+                Les URLs HTTP indiquent un trafic non chiffré. Les IPs internes révèlent
+                l'infrastructure backend. Les emails peuvent indiquer des comptes de développeurs.
+            </p>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab(this, 'tab-urls')">
+                    🌐 URLs HTTP
+                    <span class="tab-count" th:text="${#sets.size(report.urlsFound)}">0</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(this, 'tab-emails')">
+                    ✉ Emails
+                    <span class="tab-count" th:text="${#sets.size(report.emailsFound)}">0</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(this, 'tab-ips')">
+                    ◎ Adresses IP
+                    <span class="tab-count" th:text="${#sets.size(report.ipAddresses)}">0</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab(this, 'tab-secrets')">
+                    🔑 Secrets
+                    <span class="tab-count" th:text="${#sets.size(report.hardcodedSecrets)}">0</span>
+                </button>
+            </div>
+
+            <div id="tab-urls" class="tab-pane active">
+                <div class="data-list" th:if="${not #sets.isEmpty(report.urlsFound)}">
+                    <div th:each="url : ${report.urlsFound}" class="data-item">
+                        <span class="data-item-icon">⚡</span>
+                        <span class="data-item-val" th:text="${url}">—</span>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.urlsFound)}">
+                    <div class="es-icon">✓</div>Aucune URL HTTP détectée.
+                </div>
+            </div>
+
+            <div id="tab-emails" class="tab-pane">
+                <div class="data-list" th:if="${not #sets.isEmpty(report.emailsFound)}">
+                    <div th:each="email : ${report.emailsFound}" class="data-item">
+                        <span class="data-item-icon">✉</span>
+                        <span class="data-item-val" th:text="${email}">—</span>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.emailsFound)}">
+                    <div class="es-icon">✓</div>Aucun email détecté.
+                </div>
+            </div>
+
+            <div id="tab-ips" class="tab-pane">
+                <div class="data-list" th:if="${not #sets.isEmpty(report.ipAddresses)}">
+                    <div th:each="ip : ${report.ipAddresses}" class="data-item">
+                        <span class="data-item-icon">◎</span>
+                        <span class="data-item-val" th:text="${ip}">—</span>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.ipAddresses)}">
+                    <div class="es-icon">✓</div>Aucune adresse IP interne détectée.
+                </div>
+            </div>
+
+            <div id="tab-secrets" class="tab-pane">
+                <div class="data-list" th:if="${not #sets.isEmpty(report.hardcodedSecrets)}">
+                    <div th:each="s : ${report.hardcodedSecrets}" class="data-item">
+                        <span class="data-item-icon">🔑</span>
+                        <span class="data-item-val" th:text="${s}">—</span>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${#sets.isEmpty(report.hardcodedSecrets)}">
+                    <div class="es-icon">✓</div>Aucun secret en dur détecté.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ── SECTION : RECOMMANDATIONS ─────────────────────────── -->
+        <div class="section" id="recommendations">
+            <div class="section-header">
+                <div class="section-icon">◎</div>
+                <div class="section-title">Plan de remédiation</div>
+            </div>
+
+            <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
+                Actions à entreprendre, classées par priorité, pour corriger les vulnérabilités détectées.
+            </p>
+
+            <div class="rec-list">
+
+                <div class="rec-item p-critical" th:if="${report.criticalCount > 0}">
+                    <span class="rec-priority p-critical">CRITIQUE</span>
+                    <div class="rec-text">
+                        <strong>Corriger immédiatement — <span th:text="${report.criticalCount}">0</span> vulnérabilité(s) critique(s)</strong>
+                        <span>Les findings CRITICAL exposent l'application à des compromissions complètes (RCE, fuite de secrets, MITM). Bloquer le déploiement en production jusqu'à résolution.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-high" th:if="${report.highCount > 0}">
+                    <span class="rec-priority p-high">ÉLEVÉ</span>
+                    <div class="rec-text">
+                        <strong>Planifier sous 7 jours — <span th:text="${report.highCount}">0</span> vulnérabilité(s) élevée(s)</strong>
+                        <span>Les findings HIGH incluent des vecteurs d'attaque significatifs comme les permissions excessives, les URLs HTTP et les configurations SSL incorrectes.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-medium" th:if="${report.mediumCount > 0}">
+                    <span class="rec-priority p-medium">MOYEN</span>
+                    <div class="rec-text">
+                        <strong>Corriger dans le prochain sprint — <span th:text="${report.mediumCount}">0</span> vulnérabilité(s) moyenne(s)</strong>
+                        <span>Algorithmes cryptographiques faibles, logs sensibles, configurations réseau sous-optimales. Risque limité mais à ne pas ignorer.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-low" th:if="${report.lowCount > 0}">
+                    <span class="rec-priority p-low">FAIBLE</span>
+                    <div class="rec-text">
+                        <strong>À surveiller — <span th:text="${report.lowCount}">0</span> finding(s) faible(s)</strong>
+                        <span>Informations divulguées, emails exposés, anti-debug détecté. Prévoir une revue lors du prochain cycle de maintenance.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-info" th:if="${report.minSdk > 0 and report.minSdk < 29}">
+                    <span class="rec-priority p-info">SDK</span>
+                    <div class="rec-text">
+                        <strong>Mettre à jour minSdkVersion (actuellement API <span th:text="${report.minSdk}">0</span>)</strong>
+                        <span>API 29+ (Android 10) apporte des correctifs de sécurité majeurs : stockage étendu, restrictions sur les activités en arrière-plan, TLS 1.3 par défaut.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-info" th:if="${not #sets.isEmpty(report.urlsFound)}">
+                    <span class="rec-priority p-info">RÉSEAU</span>
+                    <div class="rec-text">
+                        <strong>Migrer vers HTTPS — <span th:text="${#sets.size(report.urlsFound)}">0</span> URL(s) HTTP détectée(s)</strong>
+                        <span>Toutes les communications doivent utiliser TLS 1.2+. Configurer <code style="font-family:var(--mono)">network_security_config.xml</code> avec <code style="font-family:var(--mono)">cleartextTrafficPermitted="false"</code>.</span>
+                    </div>
+                </div>
+
+                <div class="rec-item p-info" th:if="${not #sets.isEmpty(report.hardcodedSecrets)}">
+                    <span class="rec-priority p-info">SECRETS</span>
+                    <div class="rec-text">
+                        <strong>Supprimer les secrets du code — <span th:text="${#sets.size(report.hardcodedSecrets)}">0</span> secret(s) détecté(s)</strong>
+                        <span>Utiliser Android Keystore pour les clés cryptographiques, des variables d'environnement CI/CD pour les clés API, et invalider immédiatement tout secret exposé.</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center; padding:32px 0 16px; color:var(--muted); font-size:11px; font-family:var(--mono);">
+            SecureAPK Analyzer v3.0 &nbsp;·&nbsp; Rapport généré automatiquement par analyse statique
+        </div>
+
+    </main>
+</div>
+
+<!-- ── JAVASCRIPT ────────────────────────────────────────────────────────── -->
+<script>
+    // Toggle finding accordion
+    function toggleFinding(header) {
+        const card = header.closest('.finding-card');
+        card.classList.toggle('open');
+    }
+
+    // Tab switching (scoped to nearest .tab-bar sibling context)
+    function switchTab(btn, targetId) {
+        const tabBar = btn.closest('.tab-bar');
+        const section = tabBar.parentElement;
+
+        // Désactiver tous les boutons du groupe
+        tabBar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Masquer tous les panes du même parent
+        section.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.getElementById(targetId).classList.add('active');
+    }
+
+    // Highlight active sidebar link on scroll
+    const sections = document.querySelectorAll('.section[id]');
+    const navItems = document.querySelectorAll('.nav-item');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navItems.forEach(n => n.classList.remove('active'));
+                const active = document.querySelector('.nav-item[href="#' + entry.target.id + '"]');
+                if (active) active.classList.add('active');
+            }
+        });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+
+    sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
