@@ -397,7 +397,6 @@ Ce projet combine **analyse statique traditionnelle** (règles regex, décompila
 ## 👥 Auteurs
 
 ### . **Ait Zidane Salma** 
-
 ### . **El Hachimi Abdelhamid**
 ### . **El Ouatik Mourad**
 
