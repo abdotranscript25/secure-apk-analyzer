@@ -1,41 +1,303 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html>
 <head>
     <meta charset="UTF-8">
     <title>APK Security Analyzer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-        .card { border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
-        .btn-primary:hover { transform: scale(1.02); }
+        :root {
+            --primary-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --ai-grad: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --ai-grad-hover: linear-gradient(135deg, #e07de8 0%, #e04460 100%);
+            --card-radius: 20px;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Syne', sans-serif;
+        }
+
+        .card {
+            border-radius: var(--card-radius);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: none;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: var(--card-radius) var(--card-radius) 0 0 !important;
+            padding: 2rem;
+        }
+
+        .card-header h1 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 2rem;
+            letter-spacing: -0.5px;
+        }
+
+        /* ── Bouton 1 : Analyse statique (existant) ── */
+        .btn-static {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: 0.5px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            padding: 0.85rem 1.5rem;
+        }
+        .btn-static:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102,126,234,0.5);
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a3d92 100%);
+        }
+        .btn-static:active { transform: translateY(0); }
+
+        /* ── Bouton 2 : AI Analysis (nouveau) ── */
+        .btn-ai {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border: none;
+            border-radius: 12px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: 0.5px;
+            color: #fff;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            padding: 0.85rem 1.5rem;
+            cursor: pointer;
+        }
+        .btn-ai:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(245,87,108,0.5);
+            background: var(--ai-grad-hover);
+            color: #fff;
+        }
+        .btn-ai:active { transform: translateY(0); }
+        .btn-ai:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Séparateur "OU" ── */
+        .divider-or {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0.5rem 0;
+            color: #adb5bd;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+        }
+        .divider-or::before,
+        .divider-or::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #dee2e6;
+        }
+
+        /* ── Pill badge Quark Engine ── */
+        .badge-quark {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.65rem;
+            background: linear-gradient(135deg, #f093fb22, #f5576c22);
+            color: #c94b6a;
+            border: 1px solid #f5576c44;
+            border-radius: 20px;
+            padding: 3px 10px;
+            vertical-align: middle;
+        }
+
+        /* ── Spinner d'analyse IA ── */
+        #ai-loading {
+            display: none;
+        }
+        #ai-loading .spinner-border {
+            width: 1.2rem;
+            height: 1.2rem;
+            border-width: 2px;
+        }
+
+        /* ── File input custom ── */
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102,126,234,0.25);
+        }
+
+        .card-footer {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+        }
+
+        /* ── Toast erreur ── */
+        #toast-no-file {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            background: #f5576c;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            box-shadow: 0 4px 20px rgba(245,87,108,0.4);
+            display: none;
+            animation: slideIn 0.25s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
     </style>
 </head>
 <body>
+
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header bg-primary text-white text-center" style="border-radius: 20px 20px 0 0;">
+
+                <!-- ── Header ── -->
+                <div class="card-header bg-primary text-white text-center">
                     <h1 class="mb-0">🔒 APK Security Analyzer</h1>
-                    <p class="mb-0">Analyse statique d'applications Android</p>
+                    <p class="mb-0 mt-1 opacity-75" style="font-size:0.9rem;">
+                        Analyse statique &amp; IA d'applications Android
+                    </p>
                 </div>
+
+                <!-- ── Body ── -->
                 <div class="card-body p-5">
-                    <form method="post" action="/analyze" enctype="multipart/form-data">
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">📱 Sélectionner une APK</label>
-                            <input type="file" name="file" class="form-control form-control-lg" accept=".apk" required>
-                            <div class="form-text">Téléchargez un fichier .apk pour analyser sa sécurité</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100">🚀 Analyser l'APK</button>
+
+                    <!-- Sélection fichier (partagée par les deux boutons) -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">📱 Sélectionner une APK</label>
+                        <input type="file" id="apkFile" name="file"
+                               class="form-control form-control-lg" accept=".apk">
+                        <div class="form-text">Téléchargez un fichier .apk pour analyser sa sécurité</div>
+                    </div>
+
+                    <!-- ══════════════════════════════════════════════
+                         BOUTON 1 — Analyse statique (existant, inchangé)
+                         ══════════════════════════════════════════════ -->
+                    <form method="post" action="/analyze" enctype="multipart/form-data" id="staticForm">
+                        <!-- On clone le fichier dans ce form via JS -->
+                        <input type="file" name="file" id="staticFileInput" style="display:none" accept=".apk">
+                        <button type="submit" class="btn btn-static btn-lg w-100 text-white"
+                                onclick="return syncFile('staticFileInput')">
+                            🚀 Analyser l'APK
+                        </button>
                     </form>
+
+                    <!-- ── Séparateur ── -->
+                    <div class="divider-or my-3">OU</div>
+
+                    <!-- ══════════════════════════════════════════════
+                         BOUTON 2 — AI-based Analysis (nouveau)
+                         ══════════════════════════════════════════════ -->
+                    <button class="btn btn-ai btn-lg w-100" id="btnAI" onclick="analyzeAI()">
+                        <span id="ai-btn-text">🤖 AI-based Analysis</span>
+                        <span id="ai-loading" class="ms-2">
+                            <span class="spinner-border spinner-border-sm text-light" role="status"></span>
+                            Analyse en cours…
+                        </span>
+                    </button>
+                    <div class="text-center mt-2">
+                        <span class="badge-quark">⚙️ Powered by Quark Engine + LLM</span>
+                    </div>
+
+                </div><!-- /card-body -->
+
+                <!-- ── Footer ── -->
+                <div class="card-footer text-muted text-center py-3">
+                    Inspiré de MobSF · Analyse statique &amp; IA
                 </div>
-                <div class="card-footer text-muted text-center">
-                    Inspiré de MobSF - Analyse statique
-                </div>
-            </div>
+
+            </div><!-- /card -->
         </div>
     </div>
 </div>
+
+<!-- Toast erreur fichier manquant -->
+<div id="toast-no-file">⚠️ Veuillez sélectionner un fichier .apk</div>
+
+<script>
+    /**
+     * Synchronise le <input file> partagé vers le vrai champ du form statique.
+     * Retourne false si aucun fichier sélectionné (bloque le submit).
+     */
+    function syncFile(targetId) {
+        const shared = document.getElementById('apkFile');
+        if (!shared.files || shared.files.length === 0) {
+            showToast();
+            return false;
+        }
+        // Crée un DataTransfer pour copier le fichier
+        const dt = new DataTransfer();
+        dt.items.add(shared.files[0]);
+        document.getElementById(targetId).files = dt.files;
+        return true;
+    }
+
+    /**
+     * BOUTON 2 — Envoie l'APK au micro-service IA (/api/ai/analyze)
+     * puis redirige vers /ai-report si succès.
+     */
+    async function analyzeAI() {
+        const fileInput = document.getElementById('apkFile');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showToast();
+            return;
+        }
+
+        // UI → état chargement
+        const btn      = document.getElementById('btnAI');
+        const btnText  = document.getElementById('ai-btn-text');
+        const loading  = document.getElementById('ai-loading');
+        btn.disabled   = true;
+        btnText.style.display  = 'none';
+        loading.style.display  = 'inline';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const response = await fetch('/api/ai/analyze', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(err || 'Erreur serveur');
+            }
+
+            // Succès → redirection vers le rapport IA
+            window.location.href = '/ai-report';
+
+        } catch (error) {
+            console.error('AI Analysis error:', error);
+            alert('❌ Erreur lors de l\'analyse IA :\n' + error.message
+                + '\n\nVérifiez que le service Python tourne sur le port 5001.');
+        } finally {
+            btn.disabled  = false;
+            btnText.style.display = 'inline';
+            loading.style.display = 'none';
+        }
+    }
+
+    function showToast() {
+        const t = document.getElementById('toast-no-file');
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+</script>
 </body>
 </html>
