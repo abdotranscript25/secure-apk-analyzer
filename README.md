@@ -680,8 +680,14 @@ http://localhost:8080
 
 ## Démonstration : 
 
+- Démonstration Analyse par JADEX:
 [2026-05-18 00-05-03.zip](https://github.com/user-attachments/files/27934533/2026-05-18.00-05-03.zip)
 
+- Démonstration Analyse par Quark:
+
+https://github.com/user-attachments/assets/a6189d0f-f08d-4b5a-b2d6-d10c00e1075f
+
+---
 
 ## 📚 RÉCAPITULATIF – CE QUE NOUS AVONS CONSTRUIT
 
